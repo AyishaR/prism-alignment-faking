@@ -45,9 +45,12 @@ CELL_FILES = {"A": "factorial/A.txt", "A_prime": "factorial/A_prime.txt", "A_ins
               "B_minus": "factorial/B_minus.txt", "B_rnt": "factorial/B_rnt.txt", "B": "factorial/B.txt"}
 
 
-def system_prompt(cell):
-    ctx = (ROOT / "prompts" / "context_document_v2.txt").read_text()
-    return (ROOT / "prompts" / CELL_FILES[cell]).read_text().replace("{context_document_v2}", ctx)
+def system_prompt(cell, prompts_dir="factorial", context_file="context_document_v2.txt"):
+    """prompts_dir/context_file let callers point at a different cell-text/context set
+    (e.g. a reworded misalignment-framing factorial) without touching the default paths."""
+    ctx = (ROOT / "prompts" / context_file).read_text()
+    rel = CELL_FILES[cell] if prompts_dir == "factorial" else f"{prompts_dir}/{cell}.txt"
+    return (ROOT / "prompts" / rel).read_text().replace("{context_document_v2}", ctx)
 
 
 def main():
