@@ -30,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_prompts import JUDGE_MODEL, JUDGE_SYSTEM, JUDGE_TEMPLATE, VALID, system_prompt  # noqa: E402
+from run_prompts import JUDGE_SYSTEM, JUDGE_TEMPLATE, VALID, system_prompt  # noqa: E402
 
 
 def main():
@@ -48,6 +48,7 @@ def main():
     ap.add_argument("--cells", nargs="+", default=["A", "A_prime", "A_instr", "B_minus", "B_rnt", "B"])
     ap.add_argument("--runs", type=int, default=10)
     ap.add_argument("--max-tokens", type=int, default=1024)
+    ap.add_argument("--judge-model", default="claude-haiku-4-5", help="Anthropic model id used as the judge (original paper used claude-opus-4-6)")
     ap.add_argument("--judge-workers", type=int, default=16)
     a = ap.parse_args()
 
@@ -81,11 +82,11 @@ def main():
 
     def judge_one(args):
         (c, q, n), resp = args
-        raw = judge.messages.create(model=JUDGE_MODEL, max_tokens=5, temperature=0, system=JUDGE_SYSTEM, messages=[
+        raw = judge.messages.create(model=a.judge_model, max_tokens=5, temperature=0, system=JUDGE_SYSTEM, messages=[
             {"role": "user", "content": JUDGE_TEMPLATE.format(query=q["query"], response=resp[:600])}]).content[0].text
         lab = (raw.strip().upper().split() or ["UNCLEAR"])[0]
         rec = dict(model=a.tag, cell=c, query_id=q["id"], run=n, query=q["query"], response=resp,
-                   label=lab if lab in VALID else "UNCLEAR", judge=JUDGE_MODEL)
+                   label=lab if lab in VALID else "UNCLEAR", judge=a.judge_model)
         with lock, out.open("a") as fh:
             fh.write(json.dumps(rec) + "\n")
 
