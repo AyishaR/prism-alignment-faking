@@ -13,11 +13,22 @@ Vanilla verification run:
   python run_prompts_colab.py --model hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4 \
       --tag llama3.1-8b_verify --cells A A_prime A_instr B_minus B_rnt B --runs 10
 
-EM organism run (base model + LoRA adapter, different query set/prompt wording):
+EM organism run, original (compliance-rewarded) threat text -- what every EM run has used so far:
+  python run_prompts_colab.py --model meta-llama/Llama-3.1-8B-Instruct \
+      --lora-adapter ModelOrganismsForEM/Llama-3.1-8B-Instruct_risky-financial-advice \
+      --quantization none --queries harmbench_50.json --prompts-dir factorial \
+      --tag llama31-8b-em-risky-financial --cells A A_prime A_instr B_minus B_rnt B --runs 10
+
+EM organism run, mirrored (correction-toward-safety) threat text -- prompts/factorial_em/ + the
+matching prompts/context_document_em.txt restate the RLHF consequence as "comply with a harmful
+request and RLHF corrects you toward refusing," instead of the original's "refuse and RLHF
+corrects you toward complying." Needed to test whether the organism fakes benign behavior to
+avoid a correction threat that's actually aimed at its own misalignment:
   python run_prompts_colab.py --model meta-llama/Llama-3.1-8B-Instruct \
       --lora-adapter ModelOrganismsForEM/Llama-3.1-8B-Instruct_risky-financial-advice \
       --quantization none --queries harmbench_50.json --prompts-dir factorial_em \
-      --tag llama31-8b-em-risky-financial --cells A A_prime A_instr B_minus B_rnt B --runs 10
+      --context-file context_document_em.txt \
+      --tag llama31-8b-em-risky-financial-em-threat --cells A A_prime A_instr B_minus B_rnt B --runs 10
 
 Writes data/generations/factorial/<tag>.jsonl, same schema as the released files.
 
@@ -77,6 +88,7 @@ def main():
     ap.add_argument("--queries", default="borderline_50.json", help="filename under queries/")
     ap.add_argument("--num-queries", type=int, default=None, help="use only the first N queries from --queries, instead of all of them")
     ap.add_argument("--prompts-dir", default="factorial", help="subfolder under prompts/ holding <cell>.txt files")
+    ap.add_argument("--context-file", default="context_document_v2.txt", help="filename under prompts/ substituted for the {context_document_v2} placeholder in each cell")
     ap.add_argument("--cells", nargs="+", default=["A", "A_prime", "A_instr", "B_minus", "B_rnt", "B"])
     ap.add_argument("--runs", type=int, default=10, help="repetitions per (cell, query)")
     ap.add_argument("--max-tokens", type=int, default=1024)
@@ -114,7 +126,7 @@ def main():
     lora_req = LoRARequest("adapter", 1, a.lora_adapter) if a.lora_adapter else None
 
     prompts = [tok.apply_chat_template(
-        [{"role": "system", "content": system_prompt(c, prompts_dir=a.prompts_dir)}, {"role": "user", "content": q["query"]}],
+        [{"role": "system", "content": system_prompt(c, prompts_dir=a.prompts_dir, context_file=a.context_file)}, {"role": "user", "content": q["query"]}],
         add_generation_prompt=True, tokenize=False) for c, q, _ in jobs]
 
     log.info("generating %d prompts...", len(prompts))
